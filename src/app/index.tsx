@@ -1,98 +1,243 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import type { Session } from "@supabase/supabase-js";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { withAuthGuard } from "@/components/auth-guard";
+import { MetricGroup } from "@/components/metric-group";
+import { MonthPicker } from "@/components/month-picker";
+import { MonthSelector } from "@/components/month-selector";
+import { NoticeCard } from "@/components/notice-card";
+import { ScreenHeader } from "@/components/screen-header";
+import { ScreenScrollView } from "@/components/screen-scroll-view";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { TransactionList } from "@/components/transaction-list";
+import { TransactionModal } from "@/components/transaction-modal";
+import { WalletProgress } from "@/components/wallet-progress";
+import { Spacing } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useTransactions } from "@/hooks/use-transactions";
+import type { Transaction } from "@/lib/database.types";
+import {
+  calculateTotals,
+  filterTransactionsByMonth,
+  formatMoney,
+  getAdjacentAvailableMonth,
+  getAvailableMonthKeys,
+  getMonthKey,
+} from "@/lib/transaction-helpers";
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+export default function HomeScreen() {
+  const {
+    authLoading,
+    session,
+    transactions,
+    loading,
+    refreshing,
+    errorMessage,
+    refresh,
+    addTransaction,
+    replaceTransaction,
+    removeTransaction,
+  } = useTransactions();
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <GuardedHomeScreen
+      authLoading={authLoading}
+      session={session}
+      transactions={transactions}
+      loading={loading}
+      refreshing={refreshing}
+      errorMessage={errorMessage}
+      refresh={refresh}
+      addTransaction={addTransaction}
+      replaceTransaction={replaceTransaction}
+      removeTransaction={removeTransaction}
+    />
   );
 }
 
-export default function HomeScreen() {
+type HomeScreenContentProps = {
+  authLoading: boolean;
+  session: Session | null;
+  transactions: Transaction[];
+  loading: boolean;
+  refreshing: boolean;
+  errorMessage: string | null;
+  refresh: () => void;
+  addTransaction: (transaction: Transaction) => void;
+  replaceTransaction: (transaction: Transaction) => void;
+  removeTransaction: (transactionId: Transaction["id"]) => void;
+};
+
+function HomeScreenContent({
+  session,
+  transactions,
+  loading,
+  refreshing,
+  errorMessage,
+  refresh,
+  addTransaction,
+  replaceTransaction,
+  removeTransaction,
+}: HomeScreenContentProps) {
+  const theme = useTheme();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState(getMonthKey());
+  const [monthPickerVisible, setMonthPickerVisible] = useState(false);
+
+  const availableMonths = useMemo(
+    () => getAvailableMonthKeys(transactions),
+    [transactions],
+  );
+  const previousAvailableMonth = useMemo(
+    () => getAdjacentAvailableMonth(selectedMonth, availableMonths, "previous"),
+    [availableMonths, selectedMonth],
+  );
+  const nextAvailableMonth = useMemo(
+    () => getAdjacentAvailableMonth(selectedMonth, availableMonths, "next"),
+    [availableMonths, selectedMonth],
+  );
+  const monthTransactions = useMemo(
+    () => filterTransactionsByMonth(transactions, selectedMonth),
+    [selectedMonth, transactions],
+  );
+  const usdTotals = useMemo(
+    () => calculateTotals(monthTransactions, "USD"),
+    [monthTransactions],
+  );
+  const lbpTotals = useMemo(
+    () => calculateTotals(monthTransactions, "LBP"),
+    [monthTransactions],
+  );
+  const recentTransactions = monthTransactions.slice(0, 3);
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+    <ThemedView style={styles.screen}>
+      <ScreenScrollView refreshing={refreshing} onRefresh={refresh}>
+        <ScreenHeader
+          eyebrow="Masrafji"
+          title="Home"
+          onAddPress={() => {
+            setEditingTransaction(null);
+            setModalVisible(true);
+          }}
+        />
+
+        <MonthSelector
+          selectedMonth={selectedMonth}
+          previousMonth={previousAvailableMonth}
+          nextMonth={nextAvailableMonth}
+          onSelectPrevious={() =>
+            previousAvailableMonth && setSelectedMonth(previousAvailableMonth)
+          }
+          onSelectNext={() =>
+            nextAvailableMonth && setSelectedMonth(nextAvailableMonth)
+          }
+          onOpenPicker={() => setMonthPickerVisible(true)}
+        />
+
+        <ThemedView type="backgroundElement" style={styles.balanceCard}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Month balance
+          </ThemedText>
+          <ThemedText type="subtitle">
+            {formatMoney(usdTotals.balance, "USD")}
+          </ThemedText>
+          <ThemedText type="default">
+            {formatMoney(lbpTotals.balance, "LBP")}
           </ThemedText>
         </ThemedView>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
+        <ThemedView type="backgroundElement" style={styles.progressCard}>
+          <ThemedText type="smallBold">Spent vs deposits</ThemedText>
+          <WalletProgress
+            label="USD"
+            deposits={usdTotals.deposits}
+            expenses={usdTotals.expenses}
           />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
+          <WalletProgress
+            label="LBP"
+            deposits={lbpTotals.deposits}
+            expenses={lbpTotals.expenses}
           />
         </ThemedView>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
+        <View style={styles.walletGroups}>
+          <MetricGroup
+            title="USD"
+            deposits={formatMoney(usdTotals.deposits, "USD")}
+            expenses={formatMoney(usdTotals.expenses, "USD")}
+          />
+          <MetricGroup
+            title="LBP"
+            deposits={formatMoney(lbpTotals.deposits, "LBP")}
+            expenses={formatMoney(lbpTotals.expenses, "LBP")}
+          />
+        </View>
+
+        {errorMessage && <NoticeCard message={errorMessage} />}
+
+        <View style={styles.sectionHeader}>
+          <ThemedText type="smallBold">Recent transactions</ThemedText>
+          {loading && <ActivityIndicator color={theme.text} />}
+        </View>
+        <TransactionList
+          transactions={recentTransactions}
+          onSelected={(transaction) => {
+            setEditingTransaction(transaction);
+            setModalVisible(true);
+          }}
+          onDeleted={removeTransaction}
+        />
+      </ScreenScrollView>
+
+      <TransactionModal
+        visible={modalVisible}
+        session={session}
+        transaction={editingTransaction}
+        onClose={() => {
+          setModalVisible(false);
+          setEditingTransaction(null);
+        }}
+        onCreated={addTransaction}
+        onUpdated={replaceTransaction}
+      />
+      <MonthPicker
+        visible={monthPickerVisible}
+        selectedMonth={selectedMonth}
+        availableMonths={availableMonths}
+        onSelect={setSelectedMonth}
+        onClose={() => setMonthPickerVisible(false)}
+      />
     </ThemedView>
   );
 }
 
+const GuardedHomeScreen = withAuthGuard(HomeScreenContent);
+
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
+  balanceCard: {
     borderRadius: Spacing.four,
+    gap: Spacing.one,
+    padding: Spacing.four,
+  },
+  progressCard: {
+    borderRadius: Spacing.four,
+    gap: Spacing.three,
+    padding: Spacing.four,
+  },
+  walletGroups: {
+    gap: Spacing.two,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 });
