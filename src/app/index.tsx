@@ -22,7 +22,7 @@ import type {
   TransactionScreenContentProps,
 } from "@/lib/screen-props";
 import { calculateTotals, formatMoney } from "@/lib/transaction-helpers";
-import { styles } from "./index.styles";
+import { styles } from "@/screens/home/home-screen.styles";
 
 export default function HomeScreen() {
   const {

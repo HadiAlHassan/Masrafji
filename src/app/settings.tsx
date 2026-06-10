@@ -8,7 +8,7 @@ import { BottomTabInset, Spacing } from "@/constants/theme";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
-import { styles } from "./settings.styles";
+import { styles } from "@/screens/settings/settings-screen.styles";
 
 export default function SettingsScreen() {
   const safeAreaInsets = useSafeAreaInsets();

@@ -18,7 +18,7 @@ import type {
   TransactionMutationProps,
   TransactionScreenContentProps,
 } from "@/lib/screen-props";
-import { styles } from "./history.styles";
+import { styles } from "@/screens/history/history-screen.styles";
 
 type HistoryFilter = "all" | TransactionType;
 

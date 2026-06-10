@@ -16,7 +16,7 @@ import {
   calculateTotals,
   transactionCurrencies,
 } from "@/lib/transaction-helpers";
-import { styles } from "./analytics.styles";
+import { styles } from "@/screens/analytics/analytics-screen.styles";
 
 export default function AnalyticsScreen() {
   const {
