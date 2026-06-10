@@ -1,39 +1,27 @@
-import { useEffect, useState } from 'react';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  TextInput,
-  View,
-} from 'react-native';
-import type { Session } from '@supabase/supabase-js';
+import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import type { Session } from "@supabase/supabase-js";
+import { useEffect, useReducer } from "react";
+import { KeyboardAvoidingView, Modal, Platform, TextInput } from "react-native";
 
-import { CategoryPicker } from '@/components/category-picker';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import type {
-  ExpenseCategory,
-  Transaction,
-  TransactionCurrency,
-  TransactionType,
-} from '@/lib/database.types';
-import { createTransaction, updateTransaction } from '@/lib/expenses';
+import { AmountCurrencyRow } from "@/components/transaction-modal/amount-currency-row";
+import { CategorySelectorButton } from "@/components/transaction-modal/category-selector-button";
+import { SaveTransactionButton } from "@/components/transaction-modal/save-transaction-button";
+import { TransactionDateField } from "@/components/transaction-modal/transaction-date-field";
+import { TransactionModalHeader } from "@/components/transaction-modal/transaction-modal-header";
 import {
-  dateToIsoDate,
-  isoDateToLocalDate,
-  todayIsoDate,
-  transactionCategoryDetails,
-  transactionCurrencies,
-} from '@/lib/transaction-helpers';
-import { isSupabaseConfigured } from '@/lib/supabase';
-import { useTheme } from '@/hooks/use-theme';
+  getInitialTransactionModalState,
+  transactionModalReducer,
+} from "@/components/transaction-modal/transaction-modal.reducer";
+import { TransactionTypeSelector } from "@/components/transaction-modal/transaction-type-selector";
+import { CategoryPicker } from "@/components/category-picker";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { useTheme } from "@/hooks/use-theme";
+import type { Transaction } from "@/lib/database.types";
+import { createTransaction, updateTransaction } from "@/lib/expenses";
+import { dateToIsoDate } from "@/lib/transaction-helpers";
 
-import { styles } from './transaction-modal.styles';
+import { styles } from "./transaction-modal.styles";
 
 type TransactionModalProps = {
   visible: boolean;
@@ -53,17 +41,24 @@ export function TransactionModal({
   onUpdated,
 }: TransactionModalProps) {
   const theme = useTheme();
-  const [transactionType, setTransactionType] = useState<TransactionType>('expense');
-  const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<TransactionCurrency>('USD');
-  const [category, setCategory] = useState<ExpenseCategory>('food');
-  const [spentAt, setSpentAt] = useState(todayIsoDate());
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
-  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [state, dispatch] = useReducer(
+    transactionModalReducer,
+    undefined,
+    getInitialTransactionModalState,
+  );
+  const {
+    transactionType,
+    title,
+    amount,
+    currency,
+    category,
+    spentAt,
+    note,
+    saving,
+    message,
+    categoryPickerVisible,
+    datePickerVisible,
+  } = state;
 
   const isEditing = Boolean(transaction);
 
@@ -73,31 +68,15 @@ export function TransactionModal({
     }
 
     if (!transaction) {
-      resetForm();
+      dispatch({ type: "reset" });
       return;
     }
 
-    setTransactionType(transaction.transaction_type);
-    setTitle(transaction.title);
-    setAmount(String(Number(transaction.amount)));
-    setCurrency(transaction.currency);
-    setCategory(transaction.category);
-    setSpentAt(transaction.spent_at);
-    setNote(transaction.note ?? '');
-    setMessage(null);
+    dispatch({ type: "loadTransaction", transaction });
   }, [transaction, visible]);
 
   function resetForm() {
-    setTitle('');
-    setAmount('');
-    setCategory('food');
-    setCurrency('USD');
-    setTransactionType('expense');
-    setSpentAt(todayIsoDate());
-    setNote('');
-    setMessage(null);
-    setCategoryPickerVisible(false);
-    setDatePickerVisible(false);
+    dispatch({ type: "reset" });
   }
 
   function handleClose() {
@@ -112,24 +91,35 @@ export function TransactionModal({
     const parsedAmount = Number(amount);
 
     if (!session) {
-      setMessage('Sign in before saving transactions.');
+      dispatch({
+        type: "setMessage",
+        message: "Sign in before saving transactions.",
+      });
       return;
     }
 
-    if (!normalizedTitle || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setMessage('Add a title and an amount greater than zero.');
+    if (
+      !normalizedTitle ||
+      !Number.isFinite(parsedAmount) ||
+      parsedAmount <= 0
+    ) {
+      dispatch({
+        type: "setMessage",
+        message: "Add a title and an amount greater than zero.",
+      });
       return;
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedSpentAt)) {
-      setMessage('Use date format YYYY-MM-DD.');
+      dispatch({ type: "setMessage", message: "Use date format YYYY-MM-DD." });
       return;
     }
 
     try {
-      setSaving(true);
-      setMessage(null);
-      const normalizedCategory = transactionType === 'deposit' ? 'other' : category;
+      dispatch({ type: "setSaving", saving: true });
+      dispatch({ type: "setMessage", message: null });
+      const normalizedCategory =
+        transactionType === "deposit" ? "other" : category;
       const transactionPayload = {
         transaction_type: transactionType,
         title: normalizedTitle,
@@ -141,7 +131,10 @@ export function TransactionModal({
       };
 
       if (transaction) {
-        const updatedTransaction = await updateTransaction(transaction.id, transactionPayload);
+        const updatedTransaction = await updateTransaction(
+          transaction.id,
+          transactionPayload,
+        );
         onUpdated?.(updatedTransaction);
         handleClose();
         return;
@@ -155,256 +148,140 @@ export function TransactionModal({
       onCreated?.(createdTransaction);
       handleClose();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not save transaction.');
+      dispatch({
+        type: "setMessage",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not save transaction.",
+      });
     } finally {
-      setSaving(false);
+      dispatch({ type: "setSaving", saving: false });
     }
   }
 
   function setQuickDate(dayOffset: number) {
     const nextDate = new Date();
     nextDate.setDate(nextDate.getDate() + dayOffset);
-    setSpentAt(dateToIsoDate(nextDate));
+    dispatch({ type: "setSpentAt", spentAt: dateToIsoDate(nextDate) });
   }
 
   function handleDateChange(_event: DateTimePickerEvent, selectedDate?: Date) {
-    if (Platform.OS === 'android') {
-      setDatePickerVisible(false);
+    if (Platform.OS === "android") {
+      dispatch({ type: "setDatePickerVisible", visible: false });
     }
 
     if (selectedDate) {
-      setSpentAt(dateToIsoDate(selectedDate));
+      dispatch({ type: "setSpentAt", spentAt: dateToIsoDate(selectedDate) });
     }
   }
 
-  const selectedCategoryDetails = transactionCategoryDetails[category];
-
   return (
     <>
-      <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}>
-        <ThemedView type="backgroundElement" style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <View>
-              <ThemedText type="small" themeColor="textSecondary">
-                {isEditing ? 'Edit transaction' : 'New transaction'}
-              </ThemedText>
-              <ThemedText type="subtitle">{isEditing ? 'Update cashflow' : 'Add cashflow'}</ThemedText>
-            </View>
-            <Pressable
-              onPress={handleClose}
-              accessibilityRole="button"
-              accessibilityLabel="Close add transaction modal"
-              style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={theme.text} />
-            </Pressable>
-          </View>
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={handleClose}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.overlay}
+        >
+          <ThemedView type="backgroundElement" style={styles.sheet}>
+            <TransactionModalHeader isEditing={isEditing} onClose={handleClose} />
 
-          <View style={styles.segmentedRow}>
-            {(['expense', 'deposit'] as const).map((typeOption) => {
-              const selected = typeOption === transactionType;
+            <TransactionTypeSelector
+              value={transactionType}
+              onChange={(nextTransactionType) =>
+                dispatch({
+                  type: "setTransactionType",
+                  transactionType: nextTransactionType,
+                })
+              }
+            />
 
-              return (
-                <Pressable
-                  key={typeOption}
-                  onPress={() => setTransactionType(typeOption)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  style={[
-                    styles.segment,
-                    { backgroundColor: selected ? theme.text : theme.backgroundSelected },
-                  ]}>
-                  <ThemedText
-                    type="smallBold"
-                    style={{ color: selected ? theme.background : theme.text }}>
-                    {typeOption === 'expense' ? 'Expense' : 'Deposit'}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder={
-              transactionType === 'deposit'
-                ? 'Where did this come from?'
-                : 'What was this for?'
-            }
-            placeholderTextColor={theme.textSecondary}
-            style={[styles.input, { borderColor: theme.backgroundSelected, color: theme.text }]}
-            accessibilityLabel="Transaction title"
-          />
-
-          <View style={styles.inlineRow}>
             <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="Amount"
+              value={title}
+              onChangeText={(nextTitle) =>
+                dispatch({ type: "setTitle", title: nextTitle })
+              }
+              placeholder={
+                transactionType === "deposit"
+                  ? "Where did this come from?"
+                  : "What was this for?"
+              }
               placeholderTextColor={theme.textSecondary}
-              keyboardType="decimal-pad"
               style={[
                 styles.input,
-                styles.amountInput,
                 { borderColor: theme.backgroundSelected, color: theme.text },
               ]}
-              accessibilityLabel="Transaction amount"
+              accessibilityLabel="Transaction title"
             />
-            <View style={styles.currencyRow}>
-              {transactionCurrencies.map((currencyOption) => {
-                const selected = currencyOption === currency;
 
-                return (
-                  <Pressable
-                    key={currencyOption}
-                    onPress={() => setCurrency(currencyOption)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    style={[
-                      styles.currencyButton,
-                      { backgroundColor: selected ? theme.text : theme.backgroundSelected },
-                    ]}>
-                    <ThemedText
-                      type="smallBold"
-                      style={{ color: selected ? theme.background : theme.text }}>
-                      {currencyOption}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
+            <AmountCurrencyRow
+              amount={amount}
+              currency={currency}
+              onAmountChange={(nextAmount) =>
+                dispatch({ type: "setAmount", amount: nextAmount })
+              }
+              onCurrencyChange={(nextCurrency) =>
+                dispatch({ type: "setCurrency", currency: nextCurrency })
+              }
+            />
 
-          {transactionType === 'expense' && (
-            <Pressable
-              onPress={() => setCategoryPickerVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Category ${selectedCategoryDetails.label}`}
-              style={[styles.categorySelector, { borderColor: theme.backgroundSelected }]}>
-              <View style={styles.categorySelectorContent}>
-                <Ionicons name={selectedCategoryDetails.icon} size={22} color={theme.text} />
-                <View>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Category
-                  </ThemedText>
-                  <ThemedText type="smallBold">{selectedCategoryDetails.label}</ThemedText>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-            </Pressable>
-          )}
-
-          <View style={styles.dateSection}>
-            <View style={styles.quickDateRow}>
-              <Pressable
-                onPress={() => setQuickDate(0)}
-                accessibilityRole="button"
-                accessibilityLabel="Set date to today"
-                style={[
-                  styles.quickDateButton,
-                  {
-                    backgroundColor:
-                      spentAt === todayIsoDate() ? theme.text : theme.backgroundSelected,
-                  },
-                ]}>
-                <ThemedText
-                  type="smallBold"
-                  style={{ color: spentAt === todayIsoDate() ? theme.background : theme.text }}>
-                  Today
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                onPress={() => setQuickDate(-1)}
-                accessibilityRole="button"
-                accessibilityLabel="Set date to yesterday"
-                style={[
-                  styles.quickDateButton,
-                  {
-                    backgroundColor:
-                      spentAt === dateToIsoDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
-                        ? theme.text
-                        : theme.backgroundSelected,
-                  },
-                ]}>
-                <ThemedText
-                  type="smallBold"
-                  style={{
-                    color:
-                      spentAt === dateToIsoDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
-                        ? theme.background
-                        : theme.text,
-                  }}>
-                  Yesterday
-                </ThemedText>
-              </Pressable>
-            </View>
-
-            <Pressable
-              onPress={() => setDatePickerVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Transaction date ${spentAt}`}
-              style={[styles.dateSelector, { borderColor: theme.backgroundSelected }]}>
-              <View style={styles.categorySelectorContent}>
-                <Ionicons name="calendar-outline" size={22} color={theme.text} />
-                <View>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Date
-                  </ThemedText>
-                  <ThemedText type="smallBold">{spentAt}</ThemedText>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-            </Pressable>
-
-            {datePickerVisible && (
-              <DateTimePicker
-                value={isoDateToLocalDate(spentAt)}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                onChange={handleDateChange}
+            {transactionType === "expense" && (
+              <CategorySelectorButton
+                category={category}
+                onPress={() =>
+                  dispatch({ type: "setCategoryPickerVisible", visible: true })
+                }
               />
             )}
-          </View>
 
-          <TextInput
-            value={note}
-            onChangeText={setNote}
-            placeholder="Note optional"
-            placeholderTextColor={theme.textSecondary}
-            style={[styles.input, { borderColor: theme.backgroundSelected, color: theme.text }]}
-            accessibilityLabel="Transaction note"
-          />
+            <TransactionDateField
+              spentAt={spentAt}
+              datePickerVisible={datePickerVisible}
+              onQuickDate={setQuickDate}
+              onOpenDatePicker={() =>
+                dispatch({ type: "setDatePickerVisible", visible: true })
+              }
+              onDateChange={handleDateChange}
+            />
 
-          {message && (
-            <ThemedText type="small" themeColor="textSecondary">
-              {message}
-            </ThemedText>
-          )}
+            <TextInput
+              value={note}
+              onChangeText={(nextNote) =>
+                dispatch({ type: "setNote", note: nextNote })
+              }
+              placeholder="Note optional"
+              placeholderTextColor={theme.textSecondary}
+              style={[
+                styles.input,
+                { borderColor: theme.backgroundSelected, color: theme.text },
+              ]}
+              accessibilityLabel="Transaction note"
+            />
 
-          <Pressable
-            onPress={handleSave}
-            disabled={saving || !isSupabaseConfigured}
-            accessibilityRole="button"
-            accessibilityLabel="Save transaction"
-            style={({ pressed }) => [
-              styles.saveButton,
-              { opacity: pressed || saving || !isSupabaseConfigured ? 0.65 : 1 },
-            ]}>
-            <ThemedText type="smallBold" style={styles.saveButtonText}>
-              {saving ? 'Saving…' : 'Save transaction'}
-            </ThemedText>
-          </Pressable>
-        </ThemedView>
-      </KeyboardAvoidingView>
+            {message && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {message}
+              </ThemedText>
+            )}
+
+            <SaveTransactionButton saving={saving} onPress={handleSave} />
+          </ThemedView>
+        </KeyboardAvoidingView>
       </Modal>
       <CategoryPicker
         visible={categoryPickerVisible}
         selectedCategory={category}
-        onSelect={setCategory}
-        onClose={() => setCategoryPickerVisible(false)}
+        onSelect={(nextCategory) =>
+          dispatch({ type: "setCategory", category: nextCategory })
+        }
+        onClose={() =>
+          dispatch({ type: "setCategoryPickerVisible", visible: false })
+        }
       />
     </>
   );
