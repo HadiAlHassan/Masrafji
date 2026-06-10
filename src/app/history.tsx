@@ -1,16 +1,15 @@
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
 import { withAuthGuard } from "@/components/auth-guard";
-import { NoticeCard } from "@/components/notice-card";
 import { ScreenHeader } from "@/components/screen-header";
 import { ScreenScrollView } from "@/components/screen-scroll-view";
+import { ScreenState } from "@/components/screen-state";
 import { SectionHeader } from "@/components/section-header";
 import { SelectablePill } from "@/components/selectable-pill";
 import { ThemedView } from "@/components/themed-view";
 import { TransactionList } from "@/components/transaction-list";
 import { TransactionModal } from "@/components/transaction-modal";
-import { Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useTransactionModal } from "@/hooks/use-transaction-modal";
 import { useTransactions } from "@/hooks/use-transactions";
@@ -19,6 +18,7 @@ import type {
   TransactionMutationProps,
   TransactionScreenContentProps,
 } from "@/lib/screen-props";
+import { styles } from "./history.styles";
 
 type HistoryFilter = "all" | TransactionType;
 
@@ -119,11 +119,20 @@ function HistoryScreenContent({
           })}
         </View>
 
-        {errorMessage && <NoticeCard message={errorMessage} />}
+        <ScreenState errorMessage={errorMessage} />
 
         <SectionHeader
           title={`${transactions.length} transactions`}
           loading={loading}
+        />
+        <ScreenState
+          empty={transactions.length === 0}
+          emptyTitle="No transactions found"
+          emptyMessage={
+            filter === "all"
+              ? "Use the + button to add your first deposit or expense."
+              : `No ${filter}s match this filter yet.`
+          }
         />
         <TransactionList
           transactions={transactions}
@@ -145,20 +154,3 @@ function HistoryScreenContent({
 }
 
 const GuardedHistoryScreen = withAuthGuard(HistoryScreenContent);
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  filterRow: {
-    flexDirection: "row",
-    gap: Spacing.two,
-  },
-  filterButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: Spacing.three,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});

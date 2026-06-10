@@ -3,7 +3,10 @@ import { StyleSheet } from "react-native";
 import { Spacing } from "@/constants/theme";
 
 export const styles = StyleSheet.create({
-  list: {
+  screen: {
+    flex: 1,
+  },
+  currencyGrid: {
     gap: Spacing.two,
   },
 });

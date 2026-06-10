@@ -1,20 +1,19 @@
 import { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 
 import { withAuthGuard } from "@/components/auth-guard";
 import { MetricGroup } from "@/components/metric-group";
 import { MonthPicker } from "@/components/month-picker";
 import { MonthSelector } from "@/components/month-selector";
-import { NoticeCard } from "@/components/notice-card";
-import { SectionHeader } from "@/components/section-header";
 import { ScreenHeader } from "@/components/screen-header";
 import { ScreenScrollView } from "@/components/screen-scroll-view";
+import { ScreenState } from "@/components/screen-state";
+import { SectionHeader } from "@/components/section-header";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { TransactionList } from "@/components/transaction-list";
 import { TransactionModal } from "@/components/transaction-modal";
 import { WalletProgress } from "@/components/wallet-progress";
-import { Spacing } from "@/constants/theme";
 import { useMonthFilter } from "@/hooks/use-month-filter";
 import { useTransactionModal } from "@/hooks/use-transaction-modal";
 import { useTransactions } from "@/hooks/use-transactions";
@@ -23,6 +22,7 @@ import type {
   TransactionScreenContentProps,
 } from "@/lib/screen-props";
 import { calculateTotals, formatMoney } from "@/lib/transaction-helpers";
+import { styles } from "./index.styles";
 
 export default function HomeScreen() {
   const {
@@ -156,9 +156,14 @@ function HomeScreenContent({
           />
         </View>
 
-        {errorMessage && <NoticeCard message={errorMessage} />}
+        <ScreenState errorMessage={errorMessage} />
 
         <SectionHeader title="Recent transactions" loading={loading} />
+        <ScreenState
+          empty={recentTransactions.length === 0}
+          emptyTitle="No transactions this month"
+          emptyMessage="Use the + button to add your first deposit or expense."
+        />
         <TransactionList
           transactions={recentTransactions}
           onSelected={openEditTransaction}
@@ -186,22 +191,3 @@ function HomeScreenContent({
 }
 
 const GuardedHomeScreen = withAuthGuard(HomeScreenContent);
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  balanceCard: {
-    borderRadius: Spacing.four,
-    gap: Spacing.one,
-    padding: Spacing.four,
-  },
-  progressCard: {
-    borderRadius: Spacing.four,
-    gap: Spacing.three,
-    padding: Spacing.four,
-  },
-  walletGroups: {
-    gap: Spacing.two,
-  },
-});
