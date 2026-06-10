@@ -3,19 +3,10 @@ import { StyleSheet } from "react-native";
 import { Spacing } from "@/constants/theme";
 
 export const styles = StyleSheet.create({
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
-    paddingBottom: Spacing.three,
-  },
-  categoryOption: {
-    width: "48%",
-    minHeight: 96,
+  pill: {
+    minHeight: 44,
     borderRadius: Spacing.three,
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing.two,
-    padding: Spacing.three,
   },
 });

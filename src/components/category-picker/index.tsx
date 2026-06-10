@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView } from 'react-native';
 
+import { PickerSheet } from '@/components/picker-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import type { ExpenseCategory } from '@/lib/database.types';
 import { transactionCategories, transactionCategoryDetails } from '@/lib/transaction-helpers';
 import { useTheme } from '@/hooks/use-theme';
@@ -25,60 +25,45 @@ export function CategoryPicker({
   const theme = useTheme();
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <ThemedView type="backgroundElement" style={styles.sheet}>
-          <View style={styles.header}>
-            <View>
-              <ThemedText type="small" themeColor="textSecondary">
-                Expense category
-              </ThemedText>
-              <ThemedText type="subtitle">Choose category</ThemedText>
-            </View>
+    <PickerSheet
+      visible={visible}
+      eyebrow="Expense category"
+      title="Choose category"
+      closeAccessibilityLabel="Close category picker"
+      onClose={onClose}>
+      <ScrollView contentContainerStyle={styles.grid}>
+        {transactionCategories.map((category) => {
+          const categoryDetails = transactionCategoryDetails[category];
+          const selected = category === selectedCategory;
+
+          return (
             <Pressable
-              onPress={onClose}
+              key={category}
+              onPress={() => {
+                onSelect(category);
+                onClose();
+              }}
               accessibilityRole="button"
-              accessibilityLabel="Close category picker"
-              style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={theme.text} />
+              accessibilityState={{ selected }}
+              accessibilityLabel={`Select ${categoryDetails.label}`}
+              style={[
+                styles.categoryOption,
+                { backgroundColor: selected ? theme.text : theme.backgroundSelected },
+              ]}>
+              <Ionicons
+                name={categoryDetails.icon}
+                size={24}
+                color={selected ? theme.background : theme.text}
+              />
+              <ThemedText
+                type="smallBold"
+                style={{ color: selected ? theme.background : theme.text }}>
+                {categoryDetails.label}
+              </ThemedText>
             </Pressable>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.grid}>
-            {transactionCategories.map((category) => {
-              const categoryDetails = transactionCategoryDetails[category];
-              const selected = category === selectedCategory;
-
-              return (
-                <Pressable
-                  key={category}
-                  onPress={() => {
-                    onSelect(category);
-                    onClose();
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`Select ${categoryDetails.label}`}
-                  style={[
-                    styles.categoryOption,
-                    { backgroundColor: selected ? theme.text : theme.backgroundSelected },
-                  ]}>
-                  <Ionicons
-                    name={categoryDetails.icon}
-                    size={24}
-                    color={selected ? theme.background : theme.text}
-                  />
-                  <ThemedText
-                    type="smallBold"
-                    style={{ color: selected ? theme.background : theme.text }}>
-                    {categoryDetails.label}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </ThemedView>
-      </View>
-    </Modal>
+          );
+        })}
+      </ScrollView>
+    </PickerSheet>
   );
 }
