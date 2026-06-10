@@ -1,12 +1,12 @@
-import type { Session } from "@supabase/supabase-js";
-import { useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useMemo } from "react";
+import { StyleSheet, View } from "react-native";
 
 import { withAuthGuard } from "@/components/auth-guard";
 import { MetricGroup } from "@/components/metric-group";
 import { MonthPicker } from "@/components/month-picker";
 import { MonthSelector } from "@/components/month-selector";
 import { NoticeCard } from "@/components/notice-card";
+import { SectionHeader } from "@/components/section-header";
 import { ScreenHeader } from "@/components/screen-header";
 import { ScreenScrollView } from "@/components/screen-scroll-view";
 import { ThemedText } from "@/components/themed-text";
@@ -15,17 +15,14 @@ import { TransactionList } from "@/components/transaction-list";
 import { TransactionModal } from "@/components/transaction-modal";
 import { WalletProgress } from "@/components/wallet-progress";
 import { Spacing } from "@/constants/theme";
-import { useTheme } from "@/hooks/use-theme";
+import { useMonthFilter } from "@/hooks/use-month-filter";
+import { useTransactionModal } from "@/hooks/use-transaction-modal";
 import { useTransactions } from "@/hooks/use-transactions";
-import type { Transaction } from "@/lib/database.types";
-import {
-  calculateTotals,
-  filterTransactionsByMonth,
-  formatMoney,
-  getAdjacentAvailableMonth,
-  getAvailableMonthKeys,
-  getMonthKey,
-} from "@/lib/transaction-helpers";
+import type {
+  TransactionMutationProps,
+  TransactionScreenContentProps,
+} from "@/lib/screen-props";
+import { calculateTotals, formatMoney } from "@/lib/transaction-helpers";
 
 export default function HomeScreen() {
   const {
@@ -57,18 +54,8 @@ export default function HomeScreen() {
   );
 }
 
-type HomeScreenContentProps = {
-  authLoading: boolean;
-  session: Session | null;
-  transactions: Transaction[];
-  loading: boolean;
-  refreshing: boolean;
-  errorMessage: string | null;
-  refresh: () => void;
-  addTransaction: (transaction: Transaction) => void;
-  replaceTransaction: (transaction: Transaction) => void;
-  removeTransaction: (transactionId: Transaction["id"]) => void;
-};
+interface HomeScreenContentProps
+  extends TransactionScreenContentProps, TransactionMutationProps {}
 
 function HomeScreenContent({
   session,
@@ -81,29 +68,23 @@ function HomeScreenContent({
   replaceTransaction,
   removeTransaction,
 }: HomeScreenContentProps) {
-  const theme = useTheme();
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingTransaction, setEditingTransaction] =
-    useState<Transaction | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(getMonthKey());
-  const [monthPickerVisible, setMonthPickerVisible] = useState(false);
-
-  const availableMonths = useMemo(
-    () => getAvailableMonthKeys(transactions),
-    [transactions],
-  );
-  const previousAvailableMonth = useMemo(
-    () => getAdjacentAvailableMonth(selectedMonth, availableMonths, "previous"),
-    [availableMonths, selectedMonth],
-  );
-  const nextAvailableMonth = useMemo(
-    () => getAdjacentAvailableMonth(selectedMonth, availableMonths, "next"),
-    [availableMonths, selectedMonth],
-  );
-  const monthTransactions = useMemo(
-    () => filterTransactionsByMonth(transactions, selectedMonth),
-    [selectedMonth, transactions],
-  );
+  const {
+    modalVisible,
+    editingTransaction,
+    openCreateTransaction,
+    openEditTransaction,
+    closeTransactionModal,
+  } = useTransactionModal();
+  const {
+    selectedMonth,
+    setSelectedMonth,
+    monthPickerVisible,
+    setMonthPickerVisible,
+    availableMonths,
+    previousAvailableMonth,
+    nextAvailableMonth,
+    monthTransactions,
+  } = useMonthFilter(transactions);
   const usdTotals = useMemo(
     () => calculateTotals(monthTransactions, "USD"),
     [monthTransactions],
@@ -120,10 +101,7 @@ function HomeScreenContent({
         <ScreenHeader
           eyebrow="Masrafji"
           title="Home"
-          onAddPress={() => {
-            setEditingTransaction(null);
-            setModalVisible(true);
-          }}
+          onAddPress={openCreateTransaction}
         />
 
         <MonthSelector
@@ -180,16 +158,10 @@ function HomeScreenContent({
 
         {errorMessage && <NoticeCard message={errorMessage} />}
 
-        <View style={styles.sectionHeader}>
-          <ThemedText type="smallBold">Recent transactions</ThemedText>
-          {loading && <ActivityIndicator color={theme.text} />}
-        </View>
+        <SectionHeader title="Recent transactions" loading={loading} />
         <TransactionList
           transactions={recentTransactions}
-          onSelected={(transaction) => {
-            setEditingTransaction(transaction);
-            setModalVisible(true);
-          }}
+          onSelected={openEditTransaction}
           onDeleted={removeTransaction}
         />
       </ScreenScrollView>
@@ -198,10 +170,7 @@ function HomeScreenContent({
         visible={modalVisible}
         session={session}
         transaction={editingTransaction}
-        onClose={() => {
-          setModalVisible(false);
-          setEditingTransaction(null);
-        }}
+        onClose={closeTransactionModal}
         onCreated={addTransaction}
         onUpdated={replaceTransaction}
       />
@@ -234,10 +203,5 @@ const styles = StyleSheet.create({
   },
   walletGroups: {
     gap: Spacing.two,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
   },
 });
