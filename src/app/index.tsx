@@ -93,6 +93,7 @@ function HomeScreenContent({
     () => calculateTotals(monthTransactions, "LBP"),
     [monthTransactions],
   );
+  const hasLbpDeposits = lbpTotals.deposits > 0;
   const recentTransactions = monthTransactions.slice(0, 3);
 
   return (
@@ -124,9 +125,11 @@ function HomeScreenContent({
           <ThemedText type="subtitle">
             {formatMoney(usdTotals.balance, "USD")}
           </ThemedText>
-          <ThemedText type="default">
-            {formatMoney(lbpTotals.balance, "LBP")}
-          </ThemedText>
+          {hasLbpDeposits && (
+            <ThemedText type="default">
+              {formatMoney(lbpTotals.balance, "LBP")}
+            </ThemedText>
+          )}
         </ThemedView>
 
         <ThemedView type="backgroundElement" style={styles.progressCard}>
@@ -136,11 +139,13 @@ function HomeScreenContent({
             deposits={usdTotals.deposits}
             expenses={usdTotals.expenses}
           />
-          <WalletProgress
-            label="LBP"
-            deposits={lbpTotals.deposits}
-            expenses={lbpTotals.expenses}
-          />
+          {hasLbpDeposits && (
+            <WalletProgress
+              label="LBP"
+              deposits={lbpTotals.deposits}
+              expenses={lbpTotals.expenses}
+            />
+          )}
         </ThemedView>
 
         <View style={styles.walletGroups}>
