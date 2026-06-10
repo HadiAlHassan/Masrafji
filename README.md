@@ -16,6 +16,33 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
+## Build an Android APK
+
+Use the `preview` EAS profile to create an installable APK for Android:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest init
+npx eas-cli@latest build -p android --profile preview
+```
+
+When the build finishes, EAS prints a build URL. Open that URL on your Android phone to download and install the APK.
+
+You can also trigger the APK from GitHub:
+
+1. Create an Expo access token from your Expo account settings.
+2. Add it as a GitHub repository secret named `EXPO_TOKEN`.
+3. Open GitHub Actions.
+4. Run the `Android Preview APK` workflow manually.
+5. Open the EAS build URL from the workflow logs.
+
+Before building on EAS, add the public Supabase values to your EAS environment:
+
+```bash
+npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_URL --value "your-supabase-url" --environment preview --visibility plaintext
+npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "your-supabase-publishable-key" --environment preview --visibility plaintext
+```
+
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
