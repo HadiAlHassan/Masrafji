@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { Transaction } from "@/lib/database.types";
 import {
   filterTransactionsByMonth,
+  filterTransactionsUpToMonth,
   getAdjacentAvailableMonth,
   getAvailableMonthKeys,
   getMonthKey,
@@ -28,6 +29,10 @@ export function useMonthFilter(transactions: Transaction[]) {
     () => filterTransactionsByMonth(transactions, selectedMonth),
     [selectedMonth, transactions],
   );
+  const transactionsUpToMonth = useMemo(
+    () => filterTransactionsUpToMonth(transactions, selectedMonth),
+    [selectedMonth, transactions],
+  );
 
   return {
     selectedMonth,
@@ -38,5 +43,6 @@ export function useMonthFilter(transactions: Transaction[]) {
     previousAvailableMonth,
     nextAvailableMonth,
     monthTransactions,
+    transactionsUpToMonth,
   };
 }
