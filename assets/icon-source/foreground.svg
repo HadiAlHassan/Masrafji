@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="stroke" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#DCEDFF" />
+    </linearGradient>
+  </defs>
+
+  <!--
+    Android adaptive-icon foreground. The outer edges are cropped by the launcher mask,
+    so the monogram is scaled to roughly 45% of the canvas to stay inside the safe zone.
+  -->
+  <path
+    d="M 320 668 L 320 356 L 512 574 L 704 356 L 704 668"
+    fill="none"
+    stroke="url(#stroke)"
+    stroke-width="92"
+    stroke-linecap="round"
+    stroke-linejoin="round" />
+</svg>

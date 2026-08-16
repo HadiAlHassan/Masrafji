@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="backdrop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3FA0FA" />
+      <stop offset="1" stop-color="#1A6FD4" />
+    </linearGradient>
+    <linearGradient id="stroke" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#DCEDFF" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#backdrop)" />
+
+  <!-- Monogram sized to sit inside the Android adaptive-icon safe zone. -->
+  <path
+    d="M 300 700 L 300 348 L 512 590 L 724 348 L 724 700"
+    fill="none"
+    stroke="url(#stroke)"
+    stroke-width="96"
+    stroke-linecap="round"
+    stroke-linejoin="round" />
+</svg>
