@@ -49,6 +49,12 @@
         "projectId": "2274295e-f6d6-4457-950c-67e9ad4868a7"
       }
     },
-    "owner": "hadi_hsn"
+    "owner": "hadi_hsn",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2274295e-f6d6-4457-950c-67e9ad4868a7"
+    }
   }
 }
