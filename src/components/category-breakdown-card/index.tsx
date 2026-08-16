@@ -11,6 +11,7 @@ import type {
 } from "@/lib/database.types";
 import {
   formatMoney,
+  SavingCategory,
   transactionCategories,
 } from "@/lib/transaction-helpers";
 
@@ -32,7 +33,11 @@ export function CategoryBreakdownCard({
     const totals = new Map<ExpenseCategory, number>();
 
     for (const transaction of transactions) {
-      if (transaction.transaction_type !== "expense" || transaction.currency !== currency) {
+      if (
+        transaction.transaction_type !== "expense" ||
+        transaction.currency !== currency ||
+        transaction.category === SavingCategory
+      ) {
         continue;
       }
 

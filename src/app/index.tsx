@@ -21,7 +21,12 @@ import type {
   TransactionMutationProps,
   TransactionScreenContentProps,
 } from "@/lib/screen-props";
-import { calculateTotals, formatMoney } from "@/lib/transaction-helpers";
+import {
+  calculateCarriedBalance,
+  calculateSpendingTotals,
+  calculateTotals,
+  formatMoney,
+} from "@/lib/transaction-helpers";
 import { styles } from "@/screens/home/home-screen.styles";
 
 export default function HomeScreen() {
@@ -84,6 +89,7 @@ function HomeScreenContent({
     previousAvailableMonth,
     nextAvailableMonth,
     monthTransactions,
+    transactionsUpToMonth,
   } = useMonthFilter(transactions);
   const usdTotals = useMemo(
     () => calculateTotals(monthTransactions, "USD"),
@@ -93,7 +99,37 @@ function HomeScreenContent({
     () => calculateTotals(monthTransactions, "LBP"),
     [monthTransactions],
   );
+  const usdAvailable = useMemo(
+    () => calculateTotals(transactionsUpToMonth, "USD").balance,
+    [transactionsUpToMonth],
+  );
+  const lbpAvailable = useMemo(
+    () => calculateTotals(transactionsUpToMonth, "LBP").balance,
+    [transactionsUpToMonth],
+  );
+  const usdCarried = useMemo(
+    () => calculateCarriedBalance(transactions, selectedMonth, "USD"),
+    [selectedMonth, transactions],
+  );
+  // Savings are excluded here so putting money aside does not read as spending.
+  const usdSpending = useMemo(
+    () => calculateSpendingTotals(monthTransactions, "USD"),
+    [monthTransactions],
+  );
+  const lbpSpending = useMemo(
+    () => calculateSpendingTotals(monthTransactions, "LBP"),
+    [monthTransactions],
+  );
   const hasLbpDeposits = lbpTotals.deposits > 0;
+  const hasLbpAvailable = useMemo(
+    () =>
+      transactionsUpToMonth.some(
+        (transaction) =>
+          transaction.currency === "LBP" &&
+          transaction.transaction_type === "deposit",
+      ),
+    [transactionsUpToMonth],
+  );
   const recentTransactions = monthTransactions.slice(0, 3);
 
   return (
@@ -120,7 +156,26 @@ function HomeScreenContent({
 
         <ThemedView type="backgroundElement" style={styles.balanceCard}>
           <ThemedText type="small" themeColor="textSecondary">
-            Month balance
+            Available balance
+          </ThemedText>
+          <ThemedText type="subtitle">
+            {formatMoney(usdAvailable, "USD")}
+          </ThemedText>
+          {hasLbpAvailable && (
+            <ThemedText type="default">
+              {formatMoney(lbpAvailable, "LBP")}
+            </ThemedText>
+          )}
+          {usdCarried !== 0 && (
+            <ThemedText type="small" themeColor="textSecondary">
+              Includes {formatMoney(usdCarried, "USD")} carried over
+            </ThemedText>
+          )}
+        </ThemedView>
+
+        <ThemedView type="backgroundElement" style={styles.balanceCard}>
+          <ThemedText type="small" themeColor="textSecondary">
+            This month
           </ThemedText>
           <ThemedText type="subtitle">
             {formatMoney(usdTotals.balance, "USD")}
@@ -136,14 +191,14 @@ function HomeScreenContent({
           <ThemedText type="smallBold">Spent vs deposits</ThemedText>
           <WalletProgress
             label="USD"
-            deposits={usdTotals.deposits}
-            expenses={usdTotals.expenses}
+            deposits={usdSpending.deposits}
+            expenses={usdSpending.expenses}
           />
           {hasLbpDeposits && (
             <WalletProgress
               label="LBP"
-              deposits={lbpTotals.deposits}
-              expenses={lbpTotals.expenses}
+              deposits={lbpSpending.deposits}
+              expenses={lbpSpending.expenses}
             />
           )}
         </ThemedView>

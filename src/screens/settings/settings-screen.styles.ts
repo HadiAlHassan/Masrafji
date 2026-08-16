@@ -31,4 +31,11 @@ export const styles = StyleSheet.create({
   signOutText: {
     color: "#ffffff",
   },
+  outlineButton: {
+    minHeight: 48,
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

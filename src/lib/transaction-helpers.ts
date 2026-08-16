@@ -13,8 +13,15 @@ export const transactionCategories = [
   'health',
   'entertainment',
   'home',
+  'saving',
   'other',
 ] as const;
+
+/**
+ * Money moved into savings leaves the available balance but is not consumption, so it is
+ * kept out of spending comparisons and category breakdowns.
+ */
+export const SavingCategory = 'saving' satisfies ExpenseCategory;
 
 export const transactionCategoryDetails: Record<
   ExpenseCategory,
@@ -27,6 +34,7 @@ export const transactionCategoryDetails: Record<
   health: { label: 'Health', icon: 'medkit-outline' },
   entertainment: { label: 'Entertainment', icon: 'game-controller-outline' },
   home: { label: 'Home', icon: 'home-outline' },
+  saving: { label: 'Saving', icon: 'wallet-outline' },
   other: { label: 'Other', icon: 'ellipsis-horizontal-circle-outline' },
 };
 
@@ -69,6 +77,47 @@ export function calculateTotals(transactions: Transaction[], currency: Transacti
   };
 }
 
+/**
+ * Totals with savings contributions removed from the expense side, for the spending
+ * comparisons where moving money into savings should not read as consumption.
+ */
+export function calculateSpendingTotals(
+  transactions: Transaction[],
+  currency: TransactionCurrency,
+) {
+  return calculateTotals(
+    transactions.filter((transaction) => transaction.category !== SavingCategory),
+    currency,
+  );
+}
+
+/** Everything put aside as savings, across all time. */
+export function calculateSavedTotal(
+  transactions: Transaction[],
+  currency: TransactionCurrency,
+) {
+  return transactions
+    .filter(
+      (transaction) =>
+        transaction.currency === currency &&
+        transaction.transaction_type === 'expense' &&
+        transaction.category === SavingCategory,
+    )
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+}
+
+export function countSavingContributions(
+  transactions: Transaction[],
+  currency: TransactionCurrency,
+) {
+  return transactions.filter(
+    (transaction) =>
+      transaction.currency === currency &&
+      transaction.transaction_type === 'expense' &&
+      transaction.category === SavingCategory,
+  ).length;
+}
+
 export function getMonthKey(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -94,6 +143,30 @@ export function shiftMonth(monthKey: string, monthOffset: number) {
 
 export function filterTransactionsByMonth(transactions: Transaction[], monthKey: string) {
   return transactions.filter((transaction) => transaction.spent_at.startsWith(monthKey));
+}
+
+/**
+ * Transactions from every month up to and including the selected one, so a balance can
+ * account for money that was deposited before the selected month.
+ */
+export function filterTransactionsUpToMonth(transactions: Transaction[], monthKey: string) {
+  return transactions.filter((transaction) => transaction.spent_at.slice(0, 7) <= monthKey);
+}
+
+/**
+ * The balance carried into the selected month, meaning everything that happened strictly
+ * before it.
+ */
+export function calculateCarriedBalance(
+  transactions: Transaction[],
+  monthKey: string,
+  currency: TransactionCurrency,
+) {
+  const earlierTransactions = transactions.filter(
+    (transaction) => transaction.spent_at.slice(0, 7) < monthKey,
+  );
+
+  return calculateTotals(earlierTransactions, currency).balance;
 }
 
 export function getAvailableMonthKeys(transactions: Transaction[]) {

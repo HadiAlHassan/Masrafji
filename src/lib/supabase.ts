@@ -11,12 +11,18 @@ const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
 
+/**
+ * Static web rendering evaluates this module in Node, where `localStorage` does not
+ * exist, so the adapter is only passed when the global is actually available.
+ */
+const authStorage = typeof localStorage === 'undefined' ? undefined : localStorage;
+
 export const supabase = isSupabaseConfigured
   ? createClient<Database>(supabaseUrl as string, supabasePublishableKey as string, {
       auth: {
-        storage: localStorage,
+        storage: authStorage,
         autoRefreshToken: true,
-        persistSession: true,
+        persistSession: Boolean(authStorage),
         detectSessionInUrl: false,
         lock: processLock,
       },

@@ -4,18 +4,46 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { createRecoveryRedirectUrl } from '@/lib/auth-recovery';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { useTheme } from '@/hooks/use-theme';
 
 import { styles } from './auth-gate.styles';
 
+type AuthMode = 'sign-in' | 'sign-up' | 'forgot-password';
+
+const titles: Record<AuthMode, string> = {
+  'sign-in': 'Sign in',
+  'sign-up': 'Create account',
+  'forgot-password': 'Reset password',
+};
+
+const subtitles: Record<AuthMode, string> = {
+  'sign-in': 'Secure your wallet and transactions.',
+  'sign-up': 'Secure your wallet and transactions.',
+  'forgot-password': 'We email you a link to choose a new password.',
+};
+
+const submitLabels: Record<AuthMode, string> = {
+  'sign-in': 'Sign in',
+  'sign-up': 'Create account',
+  'forgot-password': 'Send reset link',
+};
+
 export function AuthGate() {
   const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
+  const [mode, setMode] = useState<AuthMode>('sign-in');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const isForgotPassword = mode === 'forgot-password';
+
+  function changeMode(nextMode: AuthMode) {
+    setMode(nextMode);
+    setMessage(null);
+  }
 
   async function handleAuthSubmit() {
     const normalizedEmail = email.trim();
@@ -25,7 +53,12 @@ export function AuthGate() {
       return;
     }
 
-    if (!normalizedEmail || password.length < 6) {
+    if (!normalizedEmail) {
+      setMessage('Use a valid email address.');
+      return;
+    }
+
+    if (!isForgotPassword && password.length < 6) {
       setMessage('Use a valid email and a password with at least 6 characters.');
       return;
     }
@@ -33,6 +66,20 @@ export function AuthGate() {
     try {
       setSubmitting(true);
       setMessage(null);
+
+      if (isForgotPassword) {
+        const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+          redirectTo: createRecoveryRedirectUrl(),
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        setMessage('If that email has an account, a reset link is on its way.');
+        return;
+      }
+
       const { error } =
         mode === 'sign-in'
           ? await supabase.auth.signInWithPassword({
@@ -68,11 +115,9 @@ export function AuthGate() {
             <ThemedText type="small" themeColor="textSecondary">
               Masrafji
             </ThemedText>
-            <ThemedText type="subtitle">
-              {mode === 'sign-in' ? 'Sign in' : 'Create account'}
-            </ThemedText>
+            <ThemedText type="subtitle">{titles[mode]}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Secure your wallet and transactions.
+              {subtitles[mode]}
             </ThemedText>
           </ThemedView>
 
@@ -88,37 +133,46 @@ export function AuthGate() {
               style={[styles.input, { borderColor: theme.backgroundSelected, color: theme.text }]}
               accessibilityLabel="Email"
             />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={theme.textSecondary}
-              autoCapitalize="none"
-              autoComplete="password"
-              secureTextEntry
-              style={[styles.input, { borderColor: theme.backgroundSelected, color: theme.text }]}
-              accessibilityLabel="Password"
-            />
+            {!isForgotPassword && (
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor={theme.textSecondary}
+                autoCapitalize="none"
+                autoComplete="password"
+                secureTextEntry
+                style={[styles.input, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                accessibilityLabel="Password"
+              />
+            )}
 
             <Pressable
               onPress={handleAuthSubmit}
               disabled={submitting || !isSupabaseConfigured}
               accessibilityRole="button"
-              accessibilityLabel={mode === 'sign-in' ? 'Sign in' : 'Create account'}
+              accessibilityLabel={submitLabels[mode]}
               style={({ pressed }) => [
                 styles.primaryButton,
                 { opacity: pressed || submitting || !isSupabaseConfigured ? 0.65 : 1 },
               ]}>
               <ThemedText type="smallBold" style={styles.primaryButtonText}>
-                {submitting ? 'Working…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
+                {submitting ? 'Working…' : submitLabels[mode]}
               </ThemedText>
             </Pressable>
 
+            {mode === 'sign-in' && (
+              <Pressable
+                onPress={() => changeMode('forgot-password')}
+                accessibilityRole="button"
+                accessibilityLabel="Forgot password"
+                style={styles.secondaryButton}>
+                <ThemedText type="smallBold">Forgot password?</ThemedText>
+              </Pressable>
+            )}
+
             <Pressable
-              onPress={() => {
-                setMode((currentMode) => (currentMode === 'sign-in' ? 'sign-up' : 'sign-in'));
-                setMessage(null);
-              }}
+              onPress={() => changeMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}
               accessibilityRole="button"
               accessibilityLabel={
                 mode === 'sign-in' ? 'Switch to create account' : 'Switch to sign in'

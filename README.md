@@ -1,83 +1,145 @@
-# Welcome to your Expo app 👋
+# Masrafji
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Masrafji is a React Native expense tracker built with Expo Router and Supabase. It tracks deposits and expenses in USD and LBP, shows monthly cashflow summaries, keeps transaction history, and provides basic analytics by category.
 
-## Get started
+## Tech Stack
 
-1. Install dependencies
+- Expo SDK 55 runtime packages
+- Expo Router with `src/app` routes
+- React Native and TypeScript
+- Supabase Auth and Postgres
+- EAS Build for Android preview APKs
+- GitHub Actions for manual APK build triggers
 
-   ```bash
-   npm install
-   ```
+## Project Structure
 
-2. Start the app
+```text
+src/app/                 Expo Router route files only
+src/components/          Reusable UI components
+src/hooks/               Shared React hooks
+src/lib/                 Supabase client, types, helpers
+src/screens/             Route-specific styles
+supabase/                SQL setup and migration scripts
+.github/workflows/       GitHub Actions workflows
+```
 
-   ```bash
-   npx expo start
-   ```
+Do not add non-route files to `src/app`. Expo Router treats files in that directory as routes.
 
-## Build an Android APK
+## Local Setup
 
-Use the `preview` EAS profile to create an installable APK for Android:
+Install dependencies:
 
 ```bash
-npx eas-cli@latest login
-npx eas-cli@latest init
+npm install
+```
+
+Create a local `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Fill in:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
+```
+
+Start Expo:
+
+```bash
+npx expo start
+```
+
+For Expo Go on Android, scan the QR code from the Expo CLI output.
+
+## Supabase Setup
+
+Run the schema in the Supabase SQL Editor:
+
+```text
+supabase/schema.sql
+```
+
+If upgrading an older prototype database, run:
+
+```text
+supabase/auth-migration.sql
+```
+
+The app expects Supabase Auth to be enabled and the `public.expenses` table to use row-level security policies scoped to the signed-in user.
+
+## Password Recovery
+
+The app uses the custom URL scheme from `app.json`:
+
+```text
+masrafji://reset-password
+```
+
+Add this redirect URL in Supabase:
+
+```text
+Authentication -> URL Configuration -> Redirect URLs
+```
+
+For local development, Expo may also generate development URLs with `Linking.createURL("reset-password")`; add the relevant URL if testing recovery links locally.
+
+## Validation
+
+Run these before committing meaningful changes:
+
+```bash
+npx tsc --noEmit
+npm run lint
+npx expo install --check
+```
+
+## Android APK Builds
+
+The EAS `preview` profile builds an installable Android APK:
+
+```bash
 npx eas-cli@latest build -p android --profile preview
 ```
 
 When the build finishes, EAS prints a build URL. Open that URL on your Android phone to download and install the APK.
 
-You can also trigger the APK from GitHub:
+## EAS Environment Variables
 
-1. Create an Expo access token from your Expo account settings.
-2. Add it as a GitHub repository secret named `EXPO_TOKEN`.
-3. Open GitHub Actions.
-4. Run the `Android Preview APK` workflow manually.
-5. Open the EAS build URL from the workflow logs.
-
-Before building on EAS, add the public Supabase values to your EAS environment:
+Add the public Supabase values to the Expo/EAS `preview` environment, not to GitHub Secrets:
 
 ```bash
 npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_URL --value "your-supabase-url" --environment preview --visibility plaintext
 npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "your-supabase-publishable-key" --environment preview --visibility plaintext
 ```
 
-In the output, you'll find options to open the app in a
+These are `EXPO_PUBLIC_*` values, so they are bundled into the app and should not contain service-role or private Supabase keys.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## GitHub Action APK Build
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+The workflow `.github/workflows/android-preview-apk.yml` manually triggers an EAS Android preview APK build.
 
-## Get a fresh project
+To configure it:
 
-When you're ready, run:
+1. Create an Expo access token from your Expo account settings.
+2. In GitHub, open `Settings -> Secrets and variables -> Actions`.
+3. Add a repository secret named `EXPO_TOKEN`.
+4. Open `Actions -> Android Preview APK`.
+5. Click `Run workflow`.
+6. Open the workflow logs and follow the EAS build URL.
 
-```bash
-npm run reset-project
-```
+The workflow uses `--no-wait`, so GitHub Actions exits after triggering the EAS build. The APK download link is available from the EAS build page.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Current EAS Metadata
 
-### Other setup steps
+- Expo owner: `hadi_hsn`
+- Android package: `com.hadialhassan.masrafji`
+- EAS project ID is stored in `app.json`
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Git Notes
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `.env` is ignored and must not be committed.
+- Keep commits logically separated.
+- Commit generated EAS project metadata when `eas init` updates `app.json`.
