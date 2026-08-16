@@ -1,82 +1,53 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
+import { useFocusEffect } from 'expo-router';
 
-import { useAuthSession } from '@/hooks/use-auth-session';
-import type { Transaction, TransactionType } from '@/lib/database.types';
-import { listTransactions } from '@/lib/expenses';
+import { useTransactionsContext } from '@/components/transactions-provider';
+import type { TransactionType } from '@/lib/database.types';
 
+/**
+ * Reads the shared transaction store. The optional `type` filters the returned list
+ * without changing what is fetched, so every screen stays backed by the same data.
+ */
 export function useTransactions(type?: TransactionType) {
-  const { session, loading: authLoading } = useAuthSession();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const {
+    authLoading,
+    session,
+    transactions,
+    loading,
+    refreshing,
+    errorMessage,
+    refresh,
+    reload,
+    addTransaction,
+    replaceTransaction,
+    removeTransaction,
+  } = useTransactionsContext();
+  const isFirstFocus = useRef(true);
 
-  const loadTransactions = useCallback(async () => {
-    if (!session) {
-      setTransactions([]);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+  // Picks up changes made outside the app, such as edits run directly against the database.
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return;
+      }
 
-    try {
-      setErrorMessage(null);
-      const nextTransactions = await listTransactions(type);
-      setTransactions(nextTransactions);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Could not load transactions.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [session, type]);
+      reload();
+    }, [reload]),
+  );
 
-  useEffect(() => {
-    loadTransactions();
-  }, [loadTransactions]);
-
-  async function refresh() {
-    setRefreshing(true);
-    await loadTransactions();
-  }
-
-  function addTransaction(transaction: Transaction) {
-    setTransactions((currentTransactions) => [transaction, ...currentTransactions]);
-  }
-
-  function replaceTransaction(transaction: Transaction) {
-    setTransactions((currentTransactions) =>
-      currentTransactions
-        .map((currentTransaction) =>
-          currentTransaction.id === transaction.id ? transaction : currentTransaction,
-        )
-        .sort((firstTransaction, secondTransaction) => {
-          const spentAtComparison =
-            new Date(secondTransaction.spent_at).getTime() -
-            new Date(firstTransaction.spent_at).getTime();
-
-          if (spentAtComparison !== 0) {
-            return spentAtComparison;
-          }
-
-          return (
-            new Date(secondTransaction.created_at).getTime() -
-            new Date(firstTransaction.created_at).getTime()
-          );
-        }),
-    );
-  }
-
-  function removeTransaction(transactionId: Transaction['id']) {
-    setTransactions((currentTransactions) =>
-      currentTransactions.filter((transaction) => transaction.id !== transactionId),
-    );
-  }
+  const visibleTransactions = useMemo(
+    () =>
+      type
+        ? transactions.filter((transaction) => transaction.transaction_type === type)
+        : transactions,
+    [transactions, type],
+  );
 
   return {
     authLoading,
     session,
-    transactions,
+    transactions: visibleTransactions,
     loading,
     refreshing,
     errorMessage,
