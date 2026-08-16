@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { KeyboardAvoidingView, Modal, Platform, TextInput } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CategoryPicker } from "@/components/category-picker";
 import { ThemedText } from "@/components/themed-text";
@@ -11,6 +12,7 @@ import { TransactionDateField } from "@/components/transaction-modal/transaction
 import { TransactionModalHeader } from "@/components/transaction-modal/transaction-modal-header";
 import { TransactionTypeSelector } from "@/components/transaction-modal/transaction-type-selector";
 import { useTransactionForm } from "@/components/transaction-modal/use-transaction-form";
+import { Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import type { Transaction } from "@/lib/database.types";
 
@@ -34,6 +36,7 @@ export function TransactionModal({
   onUpdated,
 }: TransactionModalProps) {
   const theme = useTheme();
+  const safeAreaInsets = useSafeAreaInsets();
   const {
     state,
     isEditing,
@@ -83,7 +86,13 @@ export function TransactionModal({
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.overlay}
         >
-          <ThemedView type="backgroundElement" style={styles.sheet}>
+          <ThemedView
+            type="backgroundElement"
+            style={[
+              styles.sheet,
+              { paddingBottom: safeAreaInsets.bottom + Spacing.three },
+            ]}
+          >
             <TransactionModalHeader
               isEditing={isEditing}
               onClose={handleClose}

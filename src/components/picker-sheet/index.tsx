@@ -1,9 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ReactNode } from "react";
 import { Modal, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 
 import { styles } from "./picker-sheet.styles";
@@ -26,11 +28,14 @@ export function PickerSheet({
   onClose,
 }: PickerSheetProps) {
   const theme = useTheme();
+  const safeAreaInsets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <ThemedView type="backgroundElement" style={styles.sheet}>
+        <ThemedView
+          type="backgroundElement"
+          style={[styles.sheet, { paddingBottom: safeAreaInsets.bottom + Spacing.three }]}>
           <View style={styles.header}>
             <View>
               <ThemedText type="small" themeColor="textSecondary">

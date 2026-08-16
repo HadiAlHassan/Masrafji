@@ -27,6 +27,20 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="saving">
+        <NativeTabs.Trigger.Label>Saving</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="flag-outline" />}
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="triggers">
+        <NativeTabs.Trigger.Label>Triggers</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="repeat-outline" />}
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="analytics">
         <NativeTabs.Trigger.Label>Analytics</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
