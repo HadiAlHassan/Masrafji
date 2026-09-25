@@ -13,6 +13,7 @@ import {
   formatMoney,
   SavingCategory,
   transactionCategories,
+  transactionCategoryDetails,
 } from "@/lib/transaction-helpers";
 
 import { styles } from "./category-breakdown-card.styles";
@@ -75,7 +76,9 @@ export function CategoryBreakdownCard({
         categoryTotals.map((categoryTotal) => (
           <View key={categoryTotal.category} style={styles.categoryRow}>
             <View style={styles.categoryHeader}>
-              <ThemedText type="smallBold">{categoryTotal.category}</ThemedText>
+              <ThemedText type="smallBold">
+                {transactionCategoryDetails[categoryTotal.category].label}
+              </ThemedText>
               <ThemedText type="small">
                 {formatMoney(categoryTotal.total, currency)}
               </ThemedText>

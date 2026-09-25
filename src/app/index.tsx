@@ -111,6 +111,10 @@ function HomeScreenContent({
     () => calculateCarriedBalance(transactions, selectedMonth, "USD"),
     [selectedMonth, transactions],
   );
+  const lbpCarried = useMemo(
+    () => calculateCarriedBalance(transactions, selectedMonth, "LBP"),
+    [selectedMonth, transactions],
+  );
   // Savings are excluded here so putting money aside does not read as spending.
   const usdSpending = useMemo(
     () => calculateSpendingTotals(monthTransactions, "USD"),
@@ -169,6 +173,11 @@ function HomeScreenContent({
           {usdCarried !== 0 && (
             <ThemedText type="small" themeColor="textSecondary">
               Includes {formatMoney(usdCarried, "USD")} carried over
+            </ThemedText>
+          )}
+          {hasLbpAvailable && lbpCarried !== 0 && (
+            <ThemedText type="small" themeColor="textSecondary">
+              Includes {formatMoney(lbpCarried, "LBP")} carried over
             </ThemedText>
           )}
         </ThemedView>

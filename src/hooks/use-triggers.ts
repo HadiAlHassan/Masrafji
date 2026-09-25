@@ -3,13 +3,13 @@ import { useFocusEffect } from 'expo-router';
 
 import { useTransactionsContext } from '@/components/transactions-provider';
 import type { TransactionTrigger } from '@/lib/database.types';
-import { createTransaction } from '@/lib/expenses';
+import { createTransaction, deleteTransaction } from '@/lib/expenses';
 import { describeTriggers, getPendingTriggers } from '@/lib/trigger-helpers';
 import { listTriggers, updateTrigger } from '@/lib/triggers';
 import { todayIsoDate } from '@/lib/transaction-helpers';
 
 export function useTriggers() {
-  const { session, addTransaction } = useTransactionsContext();
+  const { session, addTransaction, removeTransaction } = useTransactionsContext();
   const [triggers, setTriggers] = useState<TransactionTrigger[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,22 +85,30 @@ export function useTriggers() {
 
         addTransaction(createdTransaction);
 
-        const updatedTrigger = await updateTrigger(trigger.id, {
-          last_triggered_on: spentAt > todayIsoDate() ? todayIsoDate() : spentAt,
-        });
+        try {
+          const updatedTrigger = await updateTrigger(trigger.id, {
+            last_triggered_on: spentAt > todayIsoDate() ? todayIsoDate() : spentAt,
+          });
 
-        setTriggers((currentTriggers) =>
-          currentTriggers.map((currentTrigger) =>
-            currentTrigger.id === updatedTrigger.id ? updatedTrigger : currentTrigger,
-          ),
-        );
+          setTriggers((currentTriggers) =>
+            currentTriggers.map((currentTrigger) =>
+              currentTrigger.id === updatedTrigger.id ? updatedTrigger : currentTrigger,
+            ),
+          );
+        } catch (updateError) {
+          // The occurrence was not marked as handled, so the trigger would be offered
+          // again and fire a duplicate transaction — undo the charge instead.
+          await deleteTransaction(createdTransaction.id);
+          removeTransaction(createdTransaction.id);
+          throw updateError;
+        }
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Could not run the trigger.');
       } finally {
         setFiringId(null);
       }
     },
-    [addTransaction, session],
+    [addTransaction, removeTransaction, session],
   );
 
   /** Marks the current occurrence handled without creating a transaction. */

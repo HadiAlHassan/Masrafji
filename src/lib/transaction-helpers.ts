@@ -23,6 +23,14 @@ export const transactionCategories = [
  */
 export const SavingCategory = 'saving' satisfies ExpenseCategory;
 
+/**
+ * Note stamped on the expense recorded when a savings goal is bought. The purchase is a
+ * regular expense for the available balance, but it also drains the savings pot, so the
+ * pot math uses this note to recognize it. Editing the note of such a transaction in the
+ * history screen would make the pot drift, so treat it as reserved.
+ */
+export const SavingsGoalPurchaseNote = 'Savings goal reached';
+
 export const transactionCategoryDetails: Record<
   ExpenseCategory,
   { label: string; icon: IoniconName }
@@ -91,7 +99,12 @@ export function calculateSpendingTotals(
   );
 }
 
-/** Everything put aside as savings, across all time. */
+/**
+ * The savings pot still available to spend: everything put aside as savings minus goal
+ * purchases already made from it, across all time. Buying a goal records a regular
+ * expense, so without subtracting it here the pot would never shrink and the same saved
+ * money would keep covering every remaining goal.
+ */
 export function calculateSavedTotal(
   transactions: Transaction[],
   currency: TransactionCurrency,
@@ -99,11 +112,19 @@ export function calculateSavedTotal(
   return transactions
     .filter(
       (transaction) =>
-        transaction.currency === currency &&
-        transaction.transaction_type === 'expense' &&
-        transaction.category === SavingCategory,
+        transaction.currency === currency && transaction.transaction_type === 'expense',
     )
-    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+    .reduce((total, transaction) => {
+      if (transaction.category === SavingCategory) {
+        return total + Number(transaction.amount);
+      }
+
+      if (transaction.note === SavingsGoalPurchaseNote) {
+        return total - Number(transaction.amount);
+      }
+
+      return total;
+    }, 0);
 }
 
 export function countSavingContributions(

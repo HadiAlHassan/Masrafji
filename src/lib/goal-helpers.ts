@@ -44,7 +44,7 @@ export function sortGoalsByReach(goals: GoalProgress[]) {
     }
 
     if (firstGoal.affordable) {
-      return Number(secondGoal.goal.target_amount) - Number(firstGoal.goal.target_amount);
+      return Number(firstGoal.goal.target_amount) - Number(secondGoal.goal.target_amount);
     }
 
     return firstGoal.remaining - secondGoal.remaining;

@@ -3,18 +3,19 @@ import { useFocusEffect } from 'expo-router';
 
 import { useTransactionsContext } from '@/components/transactions-provider';
 import type { Goal, TransactionCurrency } from '@/lib/database.types';
-import { createTransaction } from '@/lib/expenses';
+import { createTransaction, deleteTransaction } from '@/lib/expenses';
 import { describeGoals, splitGoalsByStatus } from '@/lib/goal-helpers';
 import { listGoals, updateGoal } from '@/lib/goals';
 import {
   calculateSavedTotal,
   countSavingContributions,
+  SavingsGoalPurchaseNote,
   todayIsoDate,
   transactionCurrencies,
 } from '@/lib/transaction-helpers';
 
 export function useGoals() {
-  const { session, transactions, addTransaction } = useTransactionsContext();
+  const { session, transactions, addTransaction, removeTransaction } = useTransactionsContext();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,26 +107,34 @@ export function useGoals() {
           amount: Number(goal.target_amount),
           currency: goal.currency,
           category: 'shopping',
-          note: 'Savings goal reached',
+          note: SavingsGoalPurchaseNote,
           spent_at: todayIsoDate(),
         });
 
         addTransaction(createdTransaction);
 
-        const updatedGoal = await updateGoal(goal.id, { achieved_at: todayIsoDate() });
+        try {
+          const updatedGoal = await updateGoal(goal.id, { achieved_at: todayIsoDate() });
 
-        setGoals((currentGoals) =>
-          currentGoals.map((currentGoal) =>
-            currentGoal.id === updatedGoal.id ? updatedGoal : currentGoal,
-          ),
-        );
+          setGoals((currentGoals) =>
+            currentGoals.map((currentGoal) =>
+              currentGoal.id === updatedGoal.id ? updatedGoal : currentGoal,
+            ),
+          );
+        } catch (updateError) {
+          // The goal was not marked, so the purchase must not stay either — otherwise the
+          // pot is drained while the goal still reads as buyable and can be bought twice.
+          await deleteTransaction(createdTransaction.id);
+          removeTransaction(createdTransaction.id);
+          throw updateError;
+        }
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Could not complete the goal.');
       } finally {
         setBusyGoalId(null);
       }
     },
-    [addTransaction, session],
+    [addTransaction, removeTransaction, session],
   );
 
   const upsertGoal = useCallback((goal: Goal) => {
