@@ -3,19 +3,20 @@ import { useFocusEffect } from 'expo-router';
 
 import { useTransactionsContext } from '@/components/transactions-provider';
 import type { Goal, TransactionCurrency } from '@/lib/database.types';
-import { createTransaction, deleteTransaction } from '@/lib/expenses';
+import { createTransaction, deleteTransaction, updateTransaction } from '@/lib/expenses';
 import { describeGoals, splitGoalsByStatus } from '@/lib/goal-helpers';
 import { listGoals, updateGoal } from '@/lib/goals';
 import {
   calculateSavedTotal,
   countSavingContributions,
-  SavingsGoalPurchaseNote,
+  SavingCategory,
   todayIsoDate,
   transactionCurrencies,
 } from '@/lib/transaction-helpers';
 
 export function useGoals() {
-  const { session, transactions, addTransaction, removeTransaction } = useTransactionsContext();
+  const { session, transactions, addTransaction, replaceTransaction, removeTransaction } =
+    useTransactionsContext();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,8 +87,10 @@ export function useGoals() {
   const groupedGoals = useMemo(() => splitGoalsByStatus(describedGoals), [describedGoals]);
 
   /**
-   * Records the purchase as a real expense so the savings pot reflects the money actually
-   * leaving, then marks the goal achieved.
+   * Records the purchase as a real expense dated today and consumes the saving
+   * contributions that fund it (deleted or reduced, newest first). The contributions
+   * already took the money out of the available balance, so they become the purchase —
+   * the pot drains and the balance is charged once, never twice.
    */
   const achieveGoal = useCallback(
     async (goal: Goal) => {
@@ -96,24 +99,75 @@ export function useGoals() {
         return;
       }
 
+      const target = Number(goal.target_amount);
+
       try {
         setBusyGoalId(goal.id);
         setErrorMessage(null);
 
-        const createdTransaction = await createTransaction({
+        const purchase = await createTransaction({
           user_id: session.user.id,
           transaction_type: 'expense',
           title: goal.title,
-          amount: Number(goal.target_amount),
+          amount: target,
           currency: goal.currency,
           category: 'shopping',
-          note: SavingsGoalPurchaseNote,
+          note: 'Bought from savings',
           spent_at: todayIsoDate(),
         });
 
-        addTransaction(createdTransaction);
+        addTransaction(purchase);
+
+        const undo: (() => Promise<void>)[] = [];
+        let remaining = target;
 
         try {
+          const contributions = transactions
+            .filter(
+              (transaction) =>
+                transaction.currency === goal.currency &&
+                transaction.transaction_type === 'expense' &&
+                transaction.category === SavingCategory,
+            )
+            .sort((first, second) => second.spent_at.localeCompare(first.spent_at));
+
+          for (const contribution of contributions) {
+            if (remaining <= 0) {
+              break;
+            }
+
+            const amount = Number(contribution.amount);
+
+            if (amount <= remaining) {
+              await deleteTransaction(contribution.id);
+              removeTransaction(contribution.id);
+              undo.push(async () => {
+                const restored = await createTransaction({
+                  user_id: contribution.user_id,
+                  transaction_type: contribution.transaction_type,
+                  title: contribution.title,
+                  amount: Number(contribution.amount),
+                  currency: contribution.currency,
+                  category: contribution.category,
+                  note: contribution.note,
+                  spent_at: contribution.spent_at,
+                });
+                addTransaction(restored);
+              });
+              remaining = Math.round((remaining - amount) * 100) / 100;
+            } else {
+              const reducedAmount = Math.round((amount - remaining) * 100) / 100;
+
+              await updateTransaction(contribution.id, { amount: reducedAmount });
+              replaceTransaction({ ...contribution, amount: reducedAmount });
+              undo.push(async () => {
+                await updateTransaction(contribution.id, { amount });
+                replaceTransaction(contribution);
+              });
+              remaining = 0;
+            }
+          }
+
           const updatedGoal = await updateGoal(goal.id, { achieved_at: todayIsoDate() });
 
           setGoals((currentGoals) =>
@@ -121,12 +175,26 @@ export function useGoals() {
               currentGoal.id === updatedGoal.id ? updatedGoal : currentGoal,
             ),
           );
-        } catch (updateError) {
-          // The goal was not marked, so the purchase must not stay either — otherwise the
-          // pot is drained while the goal still reads as buyable and can be bought twice.
-          await deleteTransaction(createdTransaction.id);
-          removeTransaction(createdTransaction.id);
-          throw updateError;
+        } catch (error) {
+          // The goal was not marked, so undo the money moves (contributions then the
+          // purchase) — otherwise the pot is drained while the goal still reads as
+          // buyable and can be bought twice.
+          for (const undoStep of undo.reverse()) {
+            try {
+              await undoStep();
+            } catch {
+              // Best effort; the primary error is reported below.
+            }
+          }
+
+          try {
+            await deleteTransaction(purchase.id);
+          } catch {
+            // Best effort; the purchase no longer exists locally either way.
+          }
+          removeTransaction(purchase.id);
+
+          throw error;
         }
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Could not complete the goal.');
@@ -134,7 +202,7 @@ export function useGoals() {
         setBusyGoalId(null);
       }
     },
-    [addTransaction, removeTransaction, session],
+    [addTransaction, removeTransaction, replaceTransaction, session, transactions],
   );
 
   const upsertGoal = useCallback((goal: Goal) => {

@@ -23,14 +23,6 @@ export const transactionCategories = [
  */
 export const SavingCategory = 'saving' satisfies ExpenseCategory;
 
-/**
- * Note stamped on the expense recorded when a savings goal is bought. The purchase is a
- * regular expense for the available balance, but it also drains the savings pot, so the
- * pot math uses this note to recognize it. Editing the note of such a transaction in the
- * history screen would make the pot drift, so treat it as reserved.
- */
-export const SavingsGoalPurchaseNote = 'Savings goal reached';
-
 export const transactionCategoryDetails: Record<
   ExpenseCategory,
   { label: string; icon: IoniconName }
@@ -100,10 +92,9 @@ export function calculateSpendingTotals(
 }
 
 /**
- * The savings pot still available to spend: everything put aside as savings minus goal
- * purchases already made from it, across all time. Buying a goal records a regular
- * expense, so without subtracting it here the pot would never shrink and the same saved
- * money would keep covering every remaining goal.
+ * The savings pot still available to spend: everything put aside as savings, across all
+ * time. Buying a goal consumes the contributions that fund it, so this total drains
+ * naturally without needing to recognize purchase transactions.
  */
 export function calculateSavedTotal(
   transactions: Transaction[],
@@ -112,19 +103,11 @@ export function calculateSavedTotal(
   return transactions
     .filter(
       (transaction) =>
-        transaction.currency === currency && transaction.transaction_type === 'expense',
+        transaction.currency === currency &&
+        transaction.transaction_type === 'expense' &&
+        transaction.category === SavingCategory,
     )
-    .reduce((total, transaction) => {
-      if (transaction.category === SavingCategory) {
-        return total + Number(transaction.amount);
-      }
-
-      if (transaction.note === SavingsGoalPurchaseNote) {
-        return total - Number(transaction.amount);
-      }
-
-      return total;
-    }, 0);
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
 }
 
 export function countSavingContributions(
